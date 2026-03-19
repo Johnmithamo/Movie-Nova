@@ -4,7 +4,7 @@
   "description": "Freelance-style video app backend",
   "main": "app.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node app.js"
   },
   "author": "John Mithamo",
   "license": "ISC",
