@@ -251,7 +251,7 @@ const profileSchema = new Schema({
   completed: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now }
 });
-const Profile = model('Profile', profileSchema
+const Profile = model('Profile', profileSchema);
 // server.js - Part 3
 
 // ---------------------
