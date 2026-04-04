@@ -101,16 +101,55 @@ const authenticate = (req, res, next) => {
 // ---------------------
 app.post('/signup', async (req, res) => {
   const { username, email, password, role } = req.body;
+
   if (!username || !email || !password)
     return res.status(400).json({ error: 'All fields are required' });
 
   try {
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await User.create({ username, email, passwordHash, role });
+
+    const user = await User.create({
+      username,
+      email,
+      passwordHash,
+      role: role || "user"
+    });
+
     res.json({ message: 'User created', userId: user._id });
+
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: 'Email or username already exists' });
+    console.error("🔥 FULL ERROR:", err);
+
+    // Duplicate key error (VERY IMPORTANT)
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern)[0];
+
+      return res.status(400).json({
+        error: `${field} already exists`
+      });
+    }
+
+    // Validation errors
+    if (err.name === "ValidationError") {
+      return res.status(400).json({
+        error: Object.values(err.errors)
+          .map(e => e.message)
+          .join(", ")
+      });
+    }
+
+    // Mongo connection / server issues
+    if (err.name === "MongoNetworkError") {
+      return res.status(500).json({
+        error: "Database connection issue"
+      });
+    }
+
+    // Fallback
+    res.status(500).json({
+      error: "Something went wrong",
+      details: err.message
+    });
   }
 });
 
