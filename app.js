@@ -100,13 +100,13 @@ const authenticate = (req, res, next) => {
 // Auth Routes
 // ---------------------
 app.post('/signup', async (req, res) => {
-  const { username, email, password } = req.body;
+  const { username, email, password, role } = req.body;
   if (!username || !email || !password)
     return res.status(400).json({ error: 'All fields are required' });
 
   try {
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await User.create({ username, email, passwordHash });
+    const user = await User.create({ username, email, passwordHash, role });
     res.json({ message: 'User created', userId: user._id });
   } catch (err) {
     console.error(err);
