@@ -596,27 +596,7 @@ app.get('/services/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch service' });
   }
 });
-// server.js - Part 5
-
-// ---------------------
-// Extended User Schema
-// ---------------------
-userSchema.add({
-  profilePic: { type: String, default: "" },
-  phone: { type: String, default: "" },
-  notifications: {
-    email: { type: Boolean, default: true },
-    push: { type: Boolean, default: true },
-  },
-  payments: [
-    {
-      cardNumber: String,
-      expiry: String,
-      default: Boolean,
-    },
-  ],
-});
-
+// server.js - Part 
 // ---------------------
 // User Profile Endpoints
 // ---------------------
