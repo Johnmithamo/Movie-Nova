@@ -147,8 +147,8 @@ app.post('/signup', async (req, res) => {
 
     // Fallback
     res.status(500).json({
-      error: "Something went wrong",
-      details: err.message
+      error: err.message,
+      full: err
     });
   }
 });
