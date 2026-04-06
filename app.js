@@ -417,16 +417,30 @@ app.get('/seller/:id/services', async (req, res) => {
 // ---------------------
 app.post('/services', authenticate, async (req, res) => {
   try {
-    const { title, price, image, category } = req.body;
+    const { title, price, category } = req.body;
+    let image = req.body.image; // Frontend should send base64 or temporary URL
+
+    let imageUrl = null;
+
+    if (image) {
+      // Upload to Cloudinary
+      const uploadResult = await cloudinary.uploader.upload(image, {
+        folder: "services", // optional folder
+      });
+      imageUrl = uploadResult.secure_url;
+    }
+
     const service = await Service.create({
       userId: req.user.userId,
       title,
       price,
-      image,
-      category
+      category,
+      image: imageUrl
     });
+
     res.json({ service });
   } catch (err) {
+    console.error("Create service error:", err);
     res.status(500).json({ error: 'Failed to create service' });
   }
 });
