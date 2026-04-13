@@ -324,7 +324,10 @@ app.post('/profile/setup', authenticate, async (req, res) => {
     res.json({ message: 'Profile saved successfully', profile });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to save profile' });
+    res.status(500).json({
+      error: 'Failed to save profile',
+      details: err.message
+    });
   }
 });
 
