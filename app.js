@@ -115,41 +115,39 @@ app.post('/signup', async (req, res) => {
       role: role || "user"
     });
 
-    res.json({ message: 'User created', userId: user._id });
+    // 🔥 CREATE TOKEN (MISSING BEFORE)
+    const token = jwt.sign(
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    res.json({
+      message: "User created",
+      token,            // 🔥 ADD THIS
+      role: user.role,
+      userId: user._id
+    });
 
   } catch (err) {
     console.error("🔥 FULL ERROR:", err);
 
-    // Duplicate key error (VERY IMPORTANT)
     if (err.code === 11000) {
       const field = Object.keys(err.keyPattern)[0];
-
-      return res.status(400).json({
-        error: `${field} already exists`
-      });
+      return res.status(400).json({ error: `${field} already exists` });
     }
 
-    // Validation errors
     if (err.name === "ValidationError") {
       return res.status(400).json({
-        error: Object.values(err.errors)
-          .map(e => e.message)
-          .join(", ")
+        error: Object.values(err.errors).map(e => e.message).join(", ")
       });
     }
 
-    // Mongo connection / server issues
     if (err.name === "MongoNetworkError") {
-      return res.status(500).json({
-        error: "Database connection issue"
-      });
+      return res.status(500).json({ error: "Database connection issue" });
     }
 
-    // Fallback
-    res.status(500).json({
-      error: err.message,
-      full: err
-    });
+    res.status(500).json({ error: err.message });
   }
 });
 
