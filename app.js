@@ -451,15 +451,105 @@ app.post('/services', authenticate, async (req, res) => {
 // Review Schema
 // ---------------------
 const reviewSchema = new Schema({
+  serviceId: { type: Schema.Types.ObjectId, ref: 'Service' }, // ✅ ADD THIS
   sellerId: { type: Schema.Types.ObjectId, ref: 'User' },
   userId: { type: Schema.Types.ObjectId, ref: 'User' },
   rating: Number,
   comment: String,
   createdAt: { type: Date, default: Date.now }
 });
+//----------------------
+// Post Ratings
+//----------------------
+app.post('/services/:id/rate', authenticate, async (req, res) => {
+  try {
+    const { rating } = req.body;
 
-const Review = model('Review', reviewSchema);
+    // 🚫 prevent duplicate rating
+    const existing = await Review.findOne({
+      serviceId: req.params.id,
+      userId: req.user.userId
+    });
 
+    if (existing) {
+      return res.status(400).json({ error: "You already rated this service" });
+    }
+
+    // ✅ create review
+    await Review.create({
+      serviceId: req.params.id,
+      sellerId: req.body.sellerId,
+      userId: req.user.userId,
+      rating
+    });
+
+    // ✅ recalculate rating
+    const reviews = await Review.find({ serviceId: req.params.id });
+
+    const avg =
+      reviews.reduce((sum, r) => sum + r.rating, 0) /
+      reviews.length;
+
+    await Service.findByIdAndUpdate(req.params.id, {
+      rating: avg.toFixed(1)
+    });
+
+    res.json({ message: "Rated successfully", rating: avg.toFixed(1) });
+
+  } catch (err) {
+    res.status(500).json({ error: "Failed to rate service" });
+  }
+});
+//----------------------
+// favorite 
+//----------------------
+const favoriteSchema = new Schema({
+  userId: { type: Schema.Types.ObjectId, ref: 'User' },
+  serviceId: { type: Schema.Types.ObjectId, ref: 'Service' }
+});
+
+const Favorite = model('Favorite', favoriteSchema);
+// ---------------------
+// post favorites
+// ---------------------
+app.post('/favorites/toggle', authenticate, async (req, res) => {
+  try {
+    const { serviceId } = req.body;
+    const userId = req.user.userId;
+
+    const existing = await Favorite.findOne({ userId, serviceId });
+
+    if (existing) {
+      await existing.deleteOne();
+    } else {
+      await Favorite.create({ userId, serviceId });
+    }
+
+    const favorites = await Favorite.find({ userId });
+
+    res.json({
+      favorites: favorites.map(f => f.serviceId.toString())
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: "Failed to toggle favorite" });
+  }
+});
+// ---------------------
+// Get favorites
+// ---------------------
+app.get('/favorites', authenticate, async (req, res) => {
+  try {
+    const favorites = await Favorite.find({ userId: req.user.userId });
+
+    res.json({
+      favorites: favorites.map(f => f.serviceId.toString())
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch favorites" });
+  }
+});
 // ---------------------
 // Get Seller Reviews
 // ---------------------
@@ -606,7 +696,10 @@ app.get('/services', async (req, res) => {
     if (category && category !== 'All') filter.category = category;
     if (search) filter.title = { $regex: search, $options: 'i' };
 
-    const services = await Service.find(filter).sort({ createdAt: -1 }).limit(20);
+    const services = await Service.find(filter)
+      .populate('userId', 'username profilePic')
+      .sort({ createdAt: -1 })
+      .limit(20);
     res.json({ services });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch services' });
@@ -618,7 +711,10 @@ app.get('/services', async (req, res) => {
 // ---------------------
 app.get('/services/top', async (req, res) => {
   try {
-    const services = await Service.find().sort({ orders: -1 }).limit(10);
+    const services = await Service.find(filter)
+      .populate('userId', 'username profilePic')
+      .sort({ createdAt: -1 })
+      .limit(20);
     res.json({ services });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch top services' });
