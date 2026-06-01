@@ -4,24 +4,7 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const cloudinary = require('cloudinary').v2;
-require('dotenv').config();
-const nodemailer = require('nodemailer');
-
-const app = express();
-app.use(cors());
-app.use(express.json({ limit: '10mb' })); // Increased limit for base64 uploads
-
-// ---------------------
-// Email Transporter
-// ---------------------
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS // use App Password
-  }
-});
+const cloudinary = require('clo
 
 // ---------------------
 // OTP Store (temporary)
@@ -99,11 +82,11 @@ const authenticate = (req, res, next) => {
 // ---------------------
 // Auth Routes
 // ---------------------
-app.post('/signup', async (req, res) => {
+app.post("/signup", async (req, res) => {
   const { username, email, password, role } = req.body;
 
   if (!username || !email || !password)
-    return res.status(400).json({ error: 'All fields are required' });
+    return res.status(400).json({ error: "All fields are required" });
 
   try {
     const passwordHash = await bcrypt.hash(password, 10);
@@ -112,136 +95,208 @@ app.post('/signup', async (req, res) => {
       username,
       email,
       passwordHash,
-      role: role || "user"
+      role: role || "user",
     });
 
-    // 🔥 CREATE TOKEN (MISSING BEFORE)
-    const token = jwt.sign(
-      { userId: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
+    // 🔑 generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    otpStore[email] = {
+      otp,
+      expires: Date.now() + 5 * 60 * 1000,
+      type: "signup",
+      userId: user._id,
+      role: user.role,
+    };
+
+    // 📧 send OTP via Resend
+    await resend.emails.send({
+      from: "noreply@yourdomain.com",
+      to: email,
+      subject: "Verify your account",
+      html: `<h2>Your verification OTP is: ${otp}</h2><p>Expires in 5 minutes</p>`,
+    });
 
     res.json({
-      message: "User created",
-      token,            // 🔥 ADD THIS
-      role: user.role,
-      userId: user._id
+      message: "User created. Please verify your email.",
     });
 
   } catch (err) {
-    console.error("🔥 FULL ERROR:", err);
+    console.error(err);
 
     if (err.code === 11000) {
       const field = Object.keys(err.keyPattern)[0];
       return res.status(400).json({ error: `${field} already exists` });
     }
 
-    if (err.name === "ValidationError") {
-      return res.status(400).json({
-        error: Object.values(err.errors).map(e => e.message).join(", ")
-      });
-    }
-
-    if (err.name === "MongoNetworkError") {
-      return res.status(500).json({ error: "Database connection issue" });
-    }
-
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password)
-    return res.status(400).json({ error: 'Email and password required' });
+//------------------
+// Verify SignUp Otp
+//------------------
 
-  try {
-    const user = await User.findOne({ email });
-    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+app.post("/auth/verify-signup-otp", (req, res) => {
+  const { email, otp } = req.body;
 
-    const valid = await user.validatePassword(password);
-    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+  const record = otpStore[email];
 
-    const token = jwt.sign(
-      { userId: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '1d' }
-    );
+  if (!record)
+    return res.status(400).json({ error: "No OTP found" });
 
-    res.json({ token });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
+  if (record.type !== "signup")
+    return res.status(400).json({ error: "Invalid OTP type" });
+
+  if (Date.now() > record.expires)
+    return res.status(400).json({ error: "OTP expired" });
+
+  if (parseInt(otp) !== record.otp)
+    return res.status(400).json({ error: "Invalid OTP" });
+
+  const token = jwt.sign(
+    {
+      userId: record.userId,
+      role: record.role,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "1d" }
+  );
+
+  delete otpStore[email];
+
+  res.json({
+    message: "Account verified",
+    token,
+  });
 });
 
+//-------------------
+//Sign in + Send Otp
+//-------------------
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password)
+    return res.status(400).json({ error: "Email and password required" });
+
+  const user = await User.findOne({ email });
+  if (!user) return res.status(401).json({ error: "Invalid credentials" });
+
+  const valid = await user.validatePassword(password);
+  if (!valid) return res.status(401).json({ error: "Invalid credentials" });
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+  otpStore[email] = {
+    otp,
+    expires: Date.now() + 5 * 60 * 1000,
+    type: "login",
+    userId: user._id,
+    role: user.role,
+  };
+
+  await resend.emails.send({
+    from: "noreply@yourdomain.com",
+    to: email,
+    subject: "Login OTP",
+    html: `<h2>Your login OTP is: ${otp}</h2><p>Expires in 5 minutes.</p>`,
+  });
+
+  res.json({ message: "OTP sent to email" });
+});
+//-----------------
+//Verify Login Otp
+//-----------------
+
+app.post("/auth/verify-login-otp", (req, res) => {
+  const { email, otp } = req.body;
+
+  const record = otpStore[email];
+
+  if (!record)
+    return res.status(400).json({ error: "No OTP found" });
+
+  if (record.type !== "login")
+    return res.status(400).json({ error: "Invalid OTP type" });
+
+  if (Date.now() > record.expires)
+    return res.status(400).json({ error: "OTP expired" });
+
+  if (parseInt(otp) !== record.otp)
+    return res.status(400).json({ error: "Invalid OTP" });
+
+  const token = jwt.sign(
+    { userId: record.userId, role: record.role },
+    process.env.JWT_SECRET,
+    { expiresIn: "1d" }
+  );
+
+  delete otpStore[email];
+
+  res.json({
+    message: "Login successful",
+    token,
+  });
+});
 // ---------------------
 // Send OTP
 // ---------------------
-app.post('/auth/send-otp', async (req, res) => {
+app.post("/auth/send-otp", async (req, res) => {
   const { email } = req.body;
 
-  if (!email) return res.status(400).json({ error: 'Email is required' });
+  const user = await User.findOne({ email });
+  if (!user) return res.status(404).json({ error: "User not found" });
 
-  try {
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ error: 'User not found' });
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    const otp = Math.floor(100000 + Math.random() * 900000);
-    otpStore[email] = { otp, expires: Date.now() + 5 * 60 * 1000 }; // 5 min expiry
+  otpStore[email] = {
+    otp,
+    expires: Date.now() + 5 * 60 * 1000,
+    type: "reset-password",
+    userId: user._id,
+  };
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: 'Your OTP Code',
-      text: `Your OTP is: ${otp}`
-    });
+  await resend.emails.send({
+    from: "noreply@yourdomain.com",
+    to: email,
+    subject: "Password Reset OTP",
+    html: `<h2>Your password reset OTP is: ${otp}</h2>`,
+  });
 
-    res.json({ message: 'OTP sent to email' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to send OTP' });
-  }
+  res.json({ message: "OTP sent to email" });
 });
 
-// ---------------------
-// Verify OTP
-// ---------------------
-app.post('/auth/verify-otp', (req, res) => {
-  const { email, otp } = req.body;
-  const record = otpStore[email];
-
-  if (!record) return res.status(400).json({ error: 'No OTP found' });
-  if (Date.now() > record.expires) return res.status(400).json({ error: 'OTP expired' });
-  if (parseInt(otp) !== record.otp) return res.status(400).json({ error: 'Invalid OTP' });
-
-  res.json({ message: 'OTP verified' });
-});
-
-// ---------------------
-// Reset Password
-// ---------------------
-app.post('/auth/reset-password', async (req, res) => {
+// ---------------------------
+// Verify OTP + Reset Password
+// ---------------------------
+app.post("/auth/reset-password", async (req, res) => {
   const { email, otp, newPassword } = req.body;
+
   const record = otpStore[email];
 
-  if (!record) return res.status(400).json({ error: 'No OTP found' });
-  if (Date.now() > record.expires) return res.status(400).json({ error: 'OTP expired' });
-  if (parseInt(otp) !== record.otp) return res.status(400).json({ error: 'Invalid OTP' });
+  if (!record)
+    return res.status(400).json({ error: "No OTP found" });
 
-  try {
-    const user = await User.findOne({ email });
-    const hash = await bcrypt.hash(newPassword, 10);
-    user.passwordHash = hash;
-    await user.save();
+  if (record.type !== "reset-password")
+    return res.status(400).json({ error: "Invalid OTP type" });
 
-    delete otpStore[email]; // cleanup
-    res.json({ message: 'Password reset successful' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Reset failed' });
-  }
+  if (Date.now() > record.expires)
+    return res.status(400).json({ error: "OTP expired" });
+
+  if (parseInt(otp) !== record.otp)
+    return res.status(400).json({ error: "Invalid OTP" });
+
+  const user = await User.findOne({ email });
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  const hash = await bcrypt.hash(newPassword, 10);
+  user.passwordHash = hash;
+  await user.save();
+
+  delete otpStore[email];
+
+  res.json({ message: "Password reset successful" });
 });
 
 // ---------------------
