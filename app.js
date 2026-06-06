@@ -206,7 +206,7 @@ app.post("/login", async (req, res) => {
   };
 
   await resend.emails.send({
-    from: "noreply@yourdomain.com",
+    from: "onboarding@resend.dev",
     to: email,
     subject: "Login OTP",
     html: `<h2>Your login OTP is: ${otp}</h2><p>Expires in 5 minutes.</p>`,
