@@ -120,7 +120,7 @@ app.post("/signup", async (req, res) => {
 
     // 📧 send OTP via Resend
     await resend.emails.send({
-      from: "noreply@yourdomain.com",
+      from: "onboarding@resend.dev",
       to: email,
       subject: "Verify your account",
       html: `<h2>Your verification OTP is: ${otp}</h2><p>Expires in 5 minutes</p>`,
