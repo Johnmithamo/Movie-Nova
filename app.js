@@ -120,7 +120,7 @@ app.post("/signup", async (req, res) => {
 
     // 📧 send OTP via Resend
     await resend.emails.send({
-      from: "noreply@yourdomain.com",
+      from: "onboarding@resend.dev",
       to: email,
       subject: "Verify your account",
       html: `<h2>Your verification OTP is: ${otp}</h2><p>Expires in 5 minutes</p>`,
@@ -206,7 +206,7 @@ app.post("/login", async (req, res) => {
   };
 
   await resend.emails.send({
-    from: "noreply@yourdomain.com",
+    from: "onboarding@resend.dev",
     to: email,
     subject: "Login OTP",
     html: `<h2>Your login OTP is: ${otp}</h2><p>Expires in 5 minutes.</p>`,
@@ -267,7 +267,7 @@ app.post("/auth/send-otp", async (req, res) => {
   };
 
   await resend.emails.send({
-    from: "noreply@yourdomain.com",
+    from: "onboarding@resend.dev",
     to: email,
     subject: "Password Reset OTP",
     html: `<h2>Your password reset OTP is: ${otp}</h2>`,
