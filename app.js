@@ -60,7 +60,7 @@ const userSchema = new Schema({
     {
       cardNumber: String,
       expiry: String,
-      default: Boolean,
+      isDefault: Boolean,
     },
   ],
 });
@@ -120,7 +120,7 @@ app.post("/signup", async (req, res) => {
 
     // 📧 send OTP via Resend
     await resend.emails.send({
-      from: "onboarding@resend.dev",
+      from: "noreply@yourdomain.com",
       to: email,
       subject: "Verify your account",
       html: `<h2>Your verification OTP is: ${otp}</h2><p>Expires in 5 minutes</p>`,
@@ -160,7 +160,7 @@ app.post("/auth/verify-signup-otp", (req, res) => {
   if (Date.now() > record.expires)
     return res.status(400).json({ error: "OTP expired" });
 
-  if (parseInt(otp) !== record.otp)
+  if (String(otp) !== record.otp)
     return res.status(400).json({ error: "Invalid OTP" });
 
   const token = jwt.sign(
@@ -206,7 +206,7 @@ app.post("/login", async (req, res) => {
   };
 
   await resend.emails.send({
-    from: "onboarding@resend.dev",
+    from: "noreply@yourdomain.com",
     to: email,
     subject: "Login OTP",
     html: `<h2>Your login OTP is: ${otp}</h2><p>Expires in 5 minutes.</p>`,
@@ -232,7 +232,7 @@ app.post("/auth/verify-login-otp", (req, res) => {
   if (Date.now() > record.expires)
     return res.status(400).json({ error: "OTP expired" });
 
-  if (parseInt(otp) !== record.otp)
+  if (String(otp) !== record.otp)
     return res.status(400).json({ error: "Invalid OTP" });
 
   const token = jwt.sign(
@@ -293,7 +293,7 @@ app.post("/auth/reset-password", async (req, res) => {
   if (Date.now() > record.expires)
     return res.status(400).json({ error: "OTP expired" });
 
-  if (parseInt(otp) !== record.otp)
+  if (String(otp) !== record.otp)
     return res.status(400).json({ error: "Invalid OTP" });
 
   const user = await User.findOne({ email });
@@ -522,6 +522,9 @@ const reviewSchema = new Schema({
   comment: String,
   createdAt: { type: Date, default: Date.now }
 });
+
+const Review = model('Review', reviewSchema);
+
 //----------------------
 // Post Ratings
 //----------------------
@@ -775,9 +778,9 @@ app.get('/services', async (req, res) => {
 // ---------------------
 app.get('/services/top', async (req, res) => {
   try {
-    const services = await Service.find(filter)
+    const services = await Service.find({})
       .populate('userId', 'username profilePic')
-      .sort({ createdAt: -1 })
+      .sort({ rating: -1 })
       .limit(20);
     res.json({ services });
   } catch (err) {
@@ -1021,3 +1024,4 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+                     
