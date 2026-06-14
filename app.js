@@ -6,8 +6,15 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');  
 const cloudinary = require('cloudinary').v2;  
 require('dotenv').config();  
-const { Resend } = require("resend"); // ✅ FIXED   
-const resend = new Resend(process.env.RESEND_API_KEY);  
+const nodemailer = require("nodemailer");
+
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD,
+  },
+});
   
 const app = express();  
 app.use(cors());  
@@ -119,8 +126,8 @@ app.post("/signup", async (req, res) => {
     };
 
     // 📧 send OTP via Resend
-    await resend.emails.send({
-      from: "onboarding@resend.dev",
+    await transporter.sendMail({
+      from: process.env.GMAIL_USER,
       to: email,
       subject: "Verify your account",
       html: `<h2>Your verification OTP is: ${otp}</h2><p>Expires in 5 minutes</p>`,
@@ -205,8 +212,8 @@ app.post("/login", async (req, res) => {
     role: user.role,
   };
 
-  await resend.emails.send({
-    from: "onboarding@resend.dev",
+  await transporter.sendMail({
+    from: process.env.GMAIL_USER,
     to: email,
     subject: "Login OTP",
     html: `<h2>Your login OTP is: ${otp}</h2><p>Expires in 5 minutes.</p>`,
@@ -266,8 +273,8 @@ app.post("/auth/send-otp", async (req, res) => {
     userId: user._id,
   };
 
-  await resend.emails.send({
-    from: "onboarding@resend.dev",
+  await transporter.sendMail({
+    from: process.env.GMAIL_USER,
     to: email,
     subject: "Password Reset OTP",
     html: `<h2>Your password reset OTP is: ${otp}</h2>`,
@@ -1024,4 +1031,4 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
-                     
+        
