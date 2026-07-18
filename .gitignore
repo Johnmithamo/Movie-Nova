@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+# Environment variables
+.env .env.*
+# Logs
+*.log npm-debug.log*
+# Operating system files
+.DS_Store Thumbs.db
+# IDE files
+.vscode/ .idea/
+# Build output
+dist/
+build/
