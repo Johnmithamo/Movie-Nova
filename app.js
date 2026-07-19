@@ -32,12 +32,9 @@ cloudinary.config({
 // ---------------------
 // MongoDB Connection
 // ---------------------
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => console.log('✅ MongoDB connected'))
-.catch(err => console.error('❌ MongoDB connection error:', err));
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch(err => console.error("❌ MongoDB connection error:", err));
 
 // ---------------------
 // User Model
@@ -614,6 +611,28 @@ app.get('/favorites', authenticate, async (req, res) => {
     res.json({
       favorites: favorites.map(f => f.serviceId.toString())
     });
+
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch favorites" });
+  }
+});
+// ---------------------
+// Get Favorites (populated with full service details)
+// ---------------------
+app.get('/favorites/full', authenticate, async (req, res) => {
+  try {
+    const favorites = await Favorite.find({ userId: req.user.userId })
+      .populate({
+        path: 'serviceId',
+        populate: { path: 'userId', select: 'username profilePic' }
+      });
+
+    // filter out favorites whose service was deleted
+    const services = favorites
+      .filter(f => f.serviceId)
+      .map(f => f.serviceId);
+
+    res.json({ favorites: services });
 
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch favorites" });
